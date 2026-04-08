@@ -54,47 +54,59 @@
       }
     });
 
-    // Logika Utama Saat Halaman Dimuat
+// Logika Utama Saat Halaman Dimuat (Versi Auto-Diagnose)
     document.addEventListener("DOMContentLoaded", async function() {
-      // 1. Mengambil ID Pesanan dari URL (Contoh: web-ar.com/?id=12345-abcd)
       const urlParams = new URLSearchParams(window.location.search);
       const orderId = urlParams.get('id');
       const videoElement = document.querySelector('#ar-video');
       const uiOverlay = document.querySelector('#ui-overlay');
       const startBtn = document.querySelector('#start-btn');
 
+      // 1. Kunci tombol saat sedang loading agar user tidak asal klik
+      startBtn.disabled = true;
+      startBtn.style.background = "gray";
+      startBtn.innerText = "Loading database...";
+
+      // 2. Cek apakah ada parameter ?id= di link web
       if (!orderId) {
-        uiOverlay.innerHTML = "<h3>Error: ID Kado Tidak Ditemukan.</h3><p>Pastikan Anda melakukan scan dari QR Code yang benar.</p>";
+        uiOverlay.innerHTML = "<h3 style='color:#ff4444;'>Gagal: ID Tidak Ditemukan!</h3><p>Pastikan Anda menambahkan <b>?id=...</b> di akhir link web Anda.</p>";
         return;
       }
 
       try {
-        // 2. Query ke Supabase untuk mengambil URL Video pelanggan
-        uiOverlay.querySelector('h3').innerText = "Mencari data kado...";
+        uiOverlay.querySelector('h3').innerText = "Menghubungkan ke Supabase...";
+        
+        // 3. Query ke Supabase 
         const { data, error } = await supabase
           .from('orders')
           .select('target_video_url')
           .eq('id', orderId)
           .single();
 
-        if (error || !data) throw new Error("Data tidak ditemukan");
+        // Jika terjadi error dari Supabase, lempar pesan errornya
+        if (error) throw new Error("Supabase: " + error.message);
+        if (!data) throw new Error("ID ini tidak ada di tabel orders.");
 
-        // 3. Memasukkan URL Video dari database ke dalam aset A-Frame
+        // 4. Jika berhasil, masukkan video dan NYALAKAN tombol
         videoElement.setAttribute('src', data.target_video_url);
         
         uiOverlay.querySelector('h3').innerText = "Kado Digital Siap!";
+        startBtn.disabled = false;
+        startBtn.style.background = "#007BFF";
+        startBtn.innerText = "Mulai Scan Kado";
         
-        // 4. Menunggu interaksi user untuk memulai (Mencegah error Autoplay Browser)
+        // 5. Berikan aksi klik pada tombol
         startBtn.addEventListener('click', () => {
-          uiOverlay.style.display = 'none'; // Sembunyikan layar hitam
-          // Trik iOS: Putar dan pause sejenak untuk 'membuka kunci' audio video
+          uiOverlay.style.display = 'none'; 
           videoElement.play();
           videoElement.pause(); 
         });
 
       } catch (err) {
-        console.error(err);
-        uiOverlay.innerHTML = "<h3>Maaf, Kado AR Anda gagal dimuat.</h3><p>Hubungi admin atau coba lagi nanti.</p>";
+        // TAMPILKAN ERROR KE LAYAR (Tidak perlu repot buka Console)
+        uiOverlay.innerHTML = `<h3 style='color:#ff4444;'>Sistem Error</h3>
+                               <p style='background: white; color: black; padding: 10px; border-radius: 5px; font-family: monospace;'>${err.message}</p>
+                               <p>Periksa kembali ANON_KEY, URL Supabase, atau ID pesanan Anda.</p>`;
       }
     });
   </script>
