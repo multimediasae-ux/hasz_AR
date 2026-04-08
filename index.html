@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>AR Kado Interaktif - Hasz Familia</title>
+  
+  <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body { margin: 0; overflow: hidden; font-family: sans-serif; }
+    /* UI Overlay untuk meminta interaksi user (Syarat mutlak iOS/Browser modern untuk play video) */
+    #ui-overlay {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.8); z-index: 9999;
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      color: white; text-align: center;
+    }
+    #start-btn {
+      padding: 15px 30px; font-size: 18px; font-weight: bold;
+      background: #007BFF; color: white; border: none; border-radius: 8px;
+      cursor: pointer; margin-top: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    #start-btn:active { background: #0056b3; }
+    /* Layar loading bawaan MindAR kita sembunyikan dulu agar tidak tumpang tindih */
+    #example-scanning-overlay { display: none; }
+  </style>
+
+  <script>
+    // Konfigurasi Supabase Anda (Ganti dengan URL dan ANON KEY dari Dashboard Supabase Anda)
+    // PERHATIAN: Di frontend, gunakan ANON KEY (Public), BUKAN Service Role Key!
+    const SUPABASE_URL = 'https://zwlcanroyejglldvqtbu.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3bGNhbnJveWVqZ2xsZHZxdGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1NTQ5NDQsImV4cCI6MjA5MTEzMDk0NH0.W2oWeFIIDuqkb5hoAAx-oX9c-PXMCY74fet7vP4Cr58';
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Komponen A-Frame khusus buatan DevMaster untuk kontrol video (Play/Pause otomatis)
+    AFRAME.registerComponent('ar-video-controller', {
+      init: function () {
+        this.target = this.el; // Target gambar AR
+        this.videoEl = document.querySelector('#ar-video');
+
+        // Jika gambar (gantungan kunci) ditemukan oleh kamera
+        this.target.addEventListener('targetFound', () => {
+          console.log("Target Ditemukan! Memutar video...");
+          this.videoEl.play();
+        });
+
+        // Jika gambar hilang dari layar kamera (user memalingkan HP)
+        this.target.addEventListener('targetLost', () => {
+          console.log("Target Hilang! Menghentikan video sementara...");
+          this.videoEl.pause();
+        });
+      }
+    });
+
+    // Logika Utama Saat Halaman Dimuat
+    document.addEventListener("DOMContentLoaded", async function() {
+      // 1. Mengambil ID Pesanan dari URL (Contoh: web-ar.com/?id=12345-abcd)
+      const urlParams = new URLSearchParams(window.location.search);
+      const orderId = urlParams.get('id');
+      const videoElement = document.querySelector('#ar-video');
+      const uiOverlay = document.querySelector('#ui-overlay');
+      const startBtn = document.querySelector('#start-btn');
+
+      if (!orderId) {
+        uiOverlay.innerHTML = "<h3>Error: ID Kado Tidak Ditemukan.</h3><p>Pastikan Anda melakukan scan dari QR Code yang benar.</p>";
+        return;
+      }
+
+      try {
+        // 2. Query ke Supabase untuk mengambil URL Video pelanggan
+        uiOverlay.querySelector('h3').innerText = "Mencari data kado...";
+        const { data, error } = await supabase
+          .from('orders')
+          .select('target_video_url')
+          .eq('id', orderId)
+          .single();
+
+        if (error || !data) throw new Error("Data tidak ditemukan");
+
+        // 3. Memasukkan URL Video dari database ke dalam aset A-Frame
+        videoElement.setAttribute('src', data.target_video_url);
+        
+        uiOverlay.querySelector('h3').innerText = "Kado Digital Siap!";
+        
+        // 4. Menunggu interaksi user untuk memulai (Mencegah error Autoplay Browser)
+        startBtn.addEventListener('click', () => {
+          uiOverlay.style.display = 'none'; // Sembunyikan layar hitam
+          // Trik iOS: Putar dan pause sejenak untuk 'membuka kunci' audio video
+          videoElement.play();
+          videoElement.pause(); 
+        });
+
+      } catch (err) {
+        console.error(err);
+        uiOverlay.innerHTML = "<h3>Maaf, Kado AR Anda gagal dimuat.</h3><p>Hubungi admin atau coba lagi nanti.</p>";
+      }
+    });
+  </script>
+</head>
+<body>
+
+  <div id="ui-overlay">
+    <h3>Mempersiapkan AR...</h3>
+    <p>Izinkan akses kamera saat diminta.</p>
+    <button id="start-btn">Mulai Scan Kado</button>
+  </div>
+
+  <a-scene 
+    mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; uiScanning: #example-scanning-overlay;" 
+    color-space="sRGB" 
+    renderer="colorManagement: true, physicallyCorrectLights" 
+    vr-mode-ui="enabled: false" 
+    device-orientation-permission-ui="enabled: false">
+    
+    <a-assets>
+      <video id="ar-video" loop crossorigin="anonymous" playsinline webkit-playsinline></video>
+    </a-assets>
+
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+    <a-entity mindar-image-target="targetIndex: 0" ar-video-controller>
+      <a-video src="#ar-video" position="0 0 0" width="1" height="1.5" rotation="0 0 0"></a-video>
+    </a-entity>
+
+  </a-scene>
+
+</body>
+</html>
