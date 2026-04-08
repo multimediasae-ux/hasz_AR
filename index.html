@@ -10,51 +10,46 @@
 
   <style>
     body { margin: 0; overflow: hidden; font-family: sans-serif; }
-    /* UI Overlay untuk meminta interaksi user (Syarat mutlak iOS/Browser modern untuk play video) */
     #ui-overlay {
       position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.8); z-index: 9999;
+      background: rgba(0,0,0,0.9); z-index: 9999;
       display: flex; flex-direction: column; justify-content: center; align-items: center;
-      color: white; text-align: center;
+      color: white; text-align: center; padding: 20px; box-sizing: border-box;
     }
     #start-btn {
       padding: 15px 30px; font-size: 18px; font-weight: bold;
-      background: #007BFF; color: white; border: none; border-radius: 8px;
-      cursor: pointer; margin-top: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+      background: gray; color: white; border: none; border-radius: 8px;
+      margin-top: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
     }
-    #start-btn:active { background: #0056b3; }
-    /* Layar loading bawaan MindAR kita sembunyikan dulu agar tidak tumpang tindih */
     #example-scanning-overlay { display: none; }
+    .error-box { background: white; color: black; padding: 10px; border-radius: 5px; font-family: monospace; word-break: break-all; margin-top: 10px;}
   </style>
 
   <script>
-    // Konfigurasi Supabase Anda (Ganti dengan URL dan ANON KEY dari Dashboard Supabase Anda)
-    // PERHATIAN: Di frontend, gunakan ANON KEY (Public), BUKAN Service Role Key!
+    // 1. MASUKKAN URL DAN ANON KEY ANDA DI SINI
     const SUPABASE_URL = 'https://zwlcanroyejglldvqtbu.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3bGNhbnJveWVqZ2xsZHZxdGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1NTQ5NDQsImV4cCI6MjA5MTEzMDk0NH0.W2oWeFIIDuqkb5hoAAx-oX9c-PXMCY74fet7vP4Cr58';
+
+    // 2. Inisialisasi Koneksi (Menggunakan supabaseClient)
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // Komponen A-Frame khusus buatan DevMaster untuk kontrol video (Play/Pause otomatis)
+    // 3. Komponen AR
     AFRAME.registerComponent('ar-video-controller', {
       init: function () {
-        this.target = this.el; // Target gambar AR
+        this.target = this.el; 
         this.videoEl = document.querySelector('#ar-video');
 
-        // Jika gambar (gantungan kunci) ditemukan oleh kamera
         this.target.addEventListener('targetFound', () => {
-          console.log("Target Ditemukan! Memutar video...");
           this.videoEl.play();
         });
 
-        // Jika gambar hilang dari layar kamera (user memalingkan HP)
         this.target.addEventListener('targetLost', () => {
-          console.log("Target Hilang! Menghentikan video sementara...");
           this.videoEl.pause();
         });
       }
     });
 
-// Logika Utama Saat Halaman Dimuat (Versi Auto-Diagnose)
+    // 4. Logika Utama
     document.addEventListener("DOMContentLoaded", async function() {
       const urlParams = new URLSearchParams(window.location.search);
       const orderId = urlParams.get('id');
@@ -62,40 +57,36 @@
       const uiOverlay = document.querySelector('#ui-overlay');
       const startBtn = document.querySelector('#start-btn');
 
-      // 1. Kunci tombol saat sedang loading agar user tidak asal klik
       startBtn.disabled = true;
-      startBtn.style.background = "gray";
-      startBtn.innerText = "Loading database...";
 
-      // 2. Cek apakah ada parameter ?id= di link web
+      // Pengecekan URL
       if (!orderId) {
-        uiOverlay.innerHTML = "<h3 style='color:#ff4444;'>Gagal: ID Tidak Ditemukan!</h3><p>Pastikan Anda menambahkan <b>?id=...</b> di akhir link web Anda.</p>";
+        uiOverlay.innerHTML = "<h3 style='color:#ff4444;'>Gagal: ID Tidak Ditemukan!</h3><p>Pastikan link Anda diakhiri dengan <b>?id=ID_PESANAN_ANDA</b></p>";
         return;
       }
 
       try {
-        uiOverlay.querySelector('h3').innerText = "Menghubungkan ke Supabase...";
+        uiOverlay.querySelector('h3').innerText = "Menghubungkan ke Database...";
         
-        // 3. Query ke Supabase 
-        const { data, error } = await supabase
+        // Pengecekan Database menggunakan supabaseClient (BUKAN supabase)
+        const { data, error } = await supabaseClient
           .from('orders')
           .select('target_video_url')
           .eq('id', orderId)
           .single();
 
-        // Jika terjadi error dari Supabase, lempar pesan errornya
-        if (error) throw new Error("Supabase: " + error.message);
-        if (!data) throw new Error("ID ini tidak ada di tabel orders.");
+        if (error) throw new Error(error.message);
+        if (!data) throw new Error("ID tidak ada di tabel orders.");
 
-        // 4. Jika berhasil, masukkan video dan NYALAKAN tombol
+        // Jika Sukses
         videoElement.setAttribute('src', data.target_video_url);
         
         uiOverlay.querySelector('h3').innerText = "Kado Digital Siap!";
         startBtn.disabled = false;
         startBtn.style.background = "#007BFF";
+        startBtn.style.cursor = "pointer";
         startBtn.innerText = "Mulai Scan Kado";
         
-        // 5. Berikan aksi klik pada tombol
         startBtn.addEventListener('click', () => {
           uiOverlay.style.display = 'none'; 
           videoElement.play();
@@ -103,10 +94,10 @@
         });
 
       } catch (err) {
-        // TAMPILKAN ERROR KE LAYAR (Tidak perlu repot buka Console)
-        uiOverlay.innerHTML = `<h3 style='color:#ff4444;'>Sistem Error</h3>
-                               <p style='background: white; color: black; padding: 10px; border-radius: 5px; font-family: monospace;'>${err.message}</p>
-                               <p>Periksa kembali ANON_KEY, URL Supabase, atau ID pesanan Anda.</p>`;
+        uiOverlay.innerHTML = `<h3 style='color:#ff4444;'>Koneksi Gagal</h3>
+                               <p>Pesan Error:</p>
+                               <div class='error-box'>${err.message}</div>
+                               <p>Pastikan ANON KEY dan URL Supabase sudah diisi dengan benar.</p>`;
       }
     });
   </script>
@@ -115,8 +106,8 @@
 
   <div id="ui-overlay">
     <h3>Mempersiapkan AR...</h3>
-    <p>Izinkan akses kamera saat diminta.</p>
-    <button id="start-btn">Mulai Scan Kado</button>
+    <p>Mohon tunggu sebentar.</p>
+    <button id="start-btn">Loading database...</button>
   </div>
 
   <a-scene 
@@ -135,7 +126,6 @@
     <a-entity mindar-image-target="targetIndex: 0" ar-video-controller>
       <a-video src="#ar-video" position="0 0 0" width="1" height="1.5" rotation="0 0 0"></a-video>
     </a-entity>
-
   </a-scene>
 
 </body>
