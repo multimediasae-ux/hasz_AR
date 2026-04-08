@@ -32,7 +32,7 @@
     // PERHATIAN: Di frontend, gunakan ANON KEY (Public), BUKAN Service Role Key!
     const SUPABASE_URL = 'https://zwlcanroyejglldvqtbu.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3bGNhbnJveWVqZ2xsZHZxdGJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1NTQ5NDQsImV4cCI6MjA5MTEzMDk0NH0.W2oWeFIIDuqkb5hoAAx-oX9c-PXMCY74fet7vP4Cr58';
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // Komponen A-Frame khusus buatan DevMaster untuk kontrol video (Play/Pause otomatis)
     AFRAME.registerComponent('ar-video-controller', {
